@@ -1,12 +1,14 @@
-- name: Install curl and ca-certificates
+- name: Install prerequisites
   apt:
     name:
       - curl
       - ca-certificates
+      - sudo
+      - python3-psycopg2
     state: present
     update_cache: yes
 
-- name: Create pgdg directory # to store the GPG key seperately
+- name: Create pgdg directory for GPG key
   file:
     path: /usr/share/postgresql-common/pgdg
     state: directory
@@ -27,7 +29,7 @@
   apt_repository:
     repo: "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt {{ os_codename.stdout }}-pgdg main"
     state: present
-    filename: 'pgdg' # save the repository configuration to a file named /etc/apt/sources.list.d/pgdg.list so managing and deleting third-party repos later is easier
+    filename: 'pgdg'
 
 - name: Update apt cache
   apt:
@@ -35,17 +37,55 @@
 
 - name: Install PostgreSQL
   apt:
-    name: postgresql
+    name:
+      - postgresql-17
+      - postgresql-contrib-17
     state: present
+
+# Robust Cluster Cleanup for classic PostgreSQL "zombie cluster" issue
+- name: Check if cluster config exists
+  stat:
+    path: "/etc/postgresql/17/main"
+  register: cluster_config_dir
+
+- name: Check if cluster data exists
+  stat:
+    path: "/var/lib/postgresql/17/main"
+  register: cluster_data_dir
+
+- name: Remove broken cluster config directory
+  file:
+    path: "/etc/postgresql/17/main"
+    state: absent
+
+- name: Remove broken cluster data directory
+  file:
+    path: "/var/lib/postgresql/17/main"
+    state: absent
+
+- name: Ensure PostgreSQL cluster is created (only if both config and data dirs are absent)
+  command: "pg_createcluster 17 main --start"
+
+- name: Wait for PostgreSQL socket to appear
+  wait_for:
+    path: "/var/run/postgresql/.s.PGSQL.5432"
+    state: present
+    timeout: 30
 
 - name: Configure PostgreSQL settings
   template:
     src: postgresql.conf.j2
-    dest: "/etc/postgresql/{{ postgresql_version }}/main/postgresql.conf"
+    dest: "/etc/postgresql/17/main/postgresql.conf"
   notify: Restart PostgreSQL
 
-# - include_tasks: users.yml
+#- include_tasks: users.yml
 
+
+#- name: Wait for PostgreSQL to start accepting connections
+#  wait_for:
+#    path: "/var/run/postgresql/.s.PGSQL.5432"
+#    state: present
+#    timeout: 30
 
 # - name: Install PostgreSQL
 #   apt:
