@@ -1,0 +1,10 @@
+postgresql_version: 17
+
+postgresql_superuser:
+  name: postgres
+  password: 123
+
+postgresql_app_user:
+  name: appuser
+  password: 123
+  db: appdb

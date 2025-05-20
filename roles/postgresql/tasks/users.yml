@@ -1,0 +1,19 @@
+- name: Ensure PostgreSQL superuser password is set
+  become_user: postgres
+  postgresql_user:
+    name: "{{ postgresql_superuser.name }}"
+    password: "{{ postgresql_superuser.password }}"
+    role_attr_flags: "SUPERUSER"
+
+- name: Ensure application database is created
+  become_user: postgres
+  postgresql_db:
+    name: "{{ postgresql_app_user.db }}"
+
+- name: Ensure application user is created
+  become_user: postgres
+  postgresql_user:
+    name: "{{ postgresql_app_user.name }}"
+    password: "{{ postgresql_app_user.password }}"
+    db: "{{ postgresql_app_user.db }}"
+    role_attr_flags: "LOGIN"

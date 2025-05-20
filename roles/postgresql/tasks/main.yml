@@ -1,0 +1,66 @@
+- name: Install curl and ca-certificates
+  apt:
+    name:
+      - curl
+      - ca-certificates
+    state: present
+    update_cache: yes
+
+- name: Create pgdg directory # to store the GPG key seperately
+  file:
+    path: /usr/share/postgresql-common/pgdg
+    state: directory
+    mode: '0755'
+
+- name: Download PostgreSQL GPG key
+  get_url:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    dest: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+    mode: '0644'
+
+- name: Get OS version codename
+  shell: . /etc/os-release && echo $VERSION_CODENAME
+  register: os_codename
+  changed_when: false
+
+- name: Add PostgreSQL APT repository
+  apt_repository:
+    repo: "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt {{ os_codename.stdout }}-pgdg main"
+    state: present
+    filename: 'pgdg' # save the repository configuration to a file named /etc/apt/sources.list.d/pgdg.list so managing and deleting third-party repos later is easier
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install PostgreSQL
+  apt:
+    name: postgresql
+    state: present
+
+- name: Configure PostgreSQL settings
+  template:
+    src: postgresql.conf.j2
+    dest: "/etc/postgresql/{{ postgresql_version }}/main/postgresql.conf"
+  notify: Restart PostgreSQL
+
+# - include_tasks: users.yml
+
+
+# - name: Install PostgreSQL
+#   apt:
+#     name: "postgresql-{{ postgresql_version }}"
+#     state: present
+#     update_cache: yes
+
+# - name: Ensure PostgreSQL is started and enabled
+#   service:
+#     name: postgresql
+#     state: started
+#     enabled: yes
+
+# - name: Configure PostgreSQL settings
+#   template:
+#     src: postgresql.conf.j2
+#     dest: "/etc/postgresql/{{ postgresql_version }}/main/postgresql.conf"
+#   notify: Restart PostgreSQL
