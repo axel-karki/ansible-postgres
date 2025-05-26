@@ -42,65 +42,36 @@
       - postgresql-contrib-17
     state: present
 
-# Robust Cluster Cleanup for classic PostgreSQL "zombie cluster" issue
-- name: Check if cluster config exists
-  stat:
-    path: "/etc/postgresql/17/main"
-  register: cluster_config_dir
+- name: Ensure PostgreSQL is started and enabled
+  service:
+    name: postgresql
+    state: started
+    enabled: yes
 
-- name: Check if cluster data exists
-  stat:
-    path: "/var/lib/postgresql/17/main"
-  register: cluster_data_dir
+- include_tasks: users.yml
 
-- name: Remove broken cluster config directory
-  file:
-    path: "/etc/postgresql/17/main"
-    state: absent
+- name: Configure PostgreSQL authentication for postgres user
+  lineinfile:
+    path: /etc/postgresql/17/main/pg_hba.conf
+    regexp: '^local\s+all\s+postgres\s+peer'
+    line: 'local   all             postgres                                md5'
+    backup: yes
 
-- name: Remove broken cluster data directory
-  file:
-    path: "/var/lib/postgresql/17/main"
-    state: absent
+- name: Configure PostgreSQL authentication for all users
+  lineinfile:
+    path: /etc/postgresql/17/main/pg_hba.conf
+    regexp: '^local\s+all\s+all\s+peer'
+    line: 'local   all             all                                     md5'
+    backup: yes
 
-- name: Ensure PostgreSQL cluster is created (only if both config and data dirs are absent)
-  command: "pg_createcluster 17 main --start"
+- name: Restart PostgreSQL to apply auth changes
+  service:
+    name: postgresql
+    state: restarted
 
-- name: Wait for PostgreSQL socket to appear
-  wait_for:
-    path: "/var/run/postgresql/.s.PGSQL.5432"
-    state: present
-    timeout: 30
-
-- name: Configure PostgreSQL settings
-  template:
-    src: postgresql.conf.j2
-    dest: "/etc/postgresql/17/main/postgresql.conf"
-  notify: Restart PostgreSQL
-
-#- include_tasks: users.yml
-
-
-#- name: Wait for PostgreSQL to start accepting connections
-#  wait_for:
-#    path: "/var/run/postgresql/.s.PGSQL.5432"
-#    state: present
-#    timeout: 30
-
-# - name: Install PostgreSQL
-#   apt:
-#     name: "postgresql-{{ postgresql_version }}"
-#     state: present
-#     update_cache: yes
-
-# - name: Ensure PostgreSQL is started and enabled
-#   service:
-#     name: postgresql
-#     state: started
-#     enabled: yes
-
-# - name: Configure PostgreSQL settings
-#   template:
-#     src: postgresql.conf.j2
-#     dest: "/etc/postgresql/{{ postgresql_version }}/main/postgresql.conf"
-#   notify: Restart PostgreSQL
+#- name: Configure PostgreSQL settings
+#  template:
+#    src: postgresql.conf.j2
+#    dest: "/etc/postgresql/17/main/postgresql.conf"
+#    mode: '0644'
+#  notify: Restart PostgreSQL
